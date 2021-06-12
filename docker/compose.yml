@@ -1,6 +1,5 @@
 version: "3"
 services:
-  
   sonarr:
     image: ghcr.io/linuxserver/sonarr:latest
     container_name: sonarr
@@ -30,53 +29,55 @@ services:
       - ${DOWNLOAD}
     ports:
       - 7878:7878
-      
-  sabnzbd:
-    image: ghcr.io/linuxserver/sabnzbd
-    container_name: sabnzbd
-    restart: unless-stopped
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
+
+  transmission_openvpn:
+    image: haugene/transmission-openvpn
+    cap_add:
+      - NET_ADMIN
+    container_name: transmission_openvpn
+    dns:
+      - 8.8.8.8  # Using google dns
+      - 8.8.4.4 
     volumes:
-      - ${APPDATA}sabnzdb:/config
-      - ${DOWNLOAD}
-    ports:
-      - 8080:8080
-      
-  transmission:
-    image: ghcr.io/linuxserver/transmission
-    container_name: transmission
-    restart: unless-stopped    
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - USER={TRANSUSER}
-      - PASS={TRANSPASS}
-    volumes:
-      - ${APPDATA}transmission:/config
+      - ${TRANSMISSION_DATA}  # Transmission-openvpn data folder where config and stuff defaults 
       - ${DOWNLOAD}
       - ${WATCH}
-    ports:
-      - 9091:9091
-      - 51413:51413
-      - 51413:51413/udp
-
-      
-  ombi:
-    image: ghcr.io/linuxserver/ombi
-    container_name: ombi
-    restart: unless-stopped
     environment:
-      - PUID=${USVC}
-      - PGID=${GSVC}
       - TZ=${TZ}
-    volumes:
-      - ${APPDATA}ombi:/config
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - LOCAL_NETWORK=192.168.1.0/24
+      - OPENVPN_CONFIG=${OPENVPN_CONFIG}
+      - OPENVPN_USERNAME=${OPENVPN_USER}
+      - OPENVPN_PASSWORD=${OPENVPN_PASS}
+      - OPENVPN_PROVIDER=${OPENVPN_PROVIDER}
+      - TRANSMISSION_DOWNLOAD_DIR=/download/complete  # Make sure this corresponds to the ${DOWNLOAD} volume
+      - TRANSMISSION_INCOMPLETE_DIR=/download/incomplete  # Make sure this corresponds to the ${DOWNLOAD} volume
+      - TRANSMISSION_WATCH_DIR=/watch  # Make sure this corresponds to the ${WATCH} volume
+      - TRANSMISSION_WEB_UI=flood-for-transmission
+      - TRANSMISSION_RPC_USERNAME=${TRANSMISSION_USER}
+      - TRANSMISSION_RPC_PASSWORD=${TRANSMISSION_PASS}
+      - TRANSMISSION_RPC_AUTHENTICATION_REQUIRED=true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
     ports:
-      - 3579:3579
+      - '9091:9091'
+    # restart: unless-stopped   
+
+  overseerr:
+    image: ghcr.io/linuxserver/overseerr
+    container_name: overseerr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ={TZ}
+    volumes:
+      - ${APPDATA}overseerr:/config
+    ports:
+      - 5055:5055
+    restart: unless-stopped
       
   jackett:
     image: linuxserver/jackett
