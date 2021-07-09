@@ -42,6 +42,7 @@ services:
       - ${APPDATA}transmission:/data  # Transmission-openvpn data folder where config and stuff defaults 
       - ${DOWNLOAD}
       - ${WATCH}
+      - ${APPDATA}transmission/scripts:/scripts  # In case you want to plug into any of the image hooks
     environment:
       - TZ=${TZ}
       - PUID=${PUID}
