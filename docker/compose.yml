@@ -39,7 +39,7 @@ services:
       - 8.8.8.8  # Using google dns
       - 8.8.4.4 
     volumes:
-      - ${TRANSMISSION_DATA}  # Transmission-openvpn data folder where config and stuff defaults 
+      - ${APPDATA}transmission:/data  # Transmission-openvpn data folder where config and stuff defaults 
       - ${DOWNLOAD}
       - ${WATCH}
     environment:
