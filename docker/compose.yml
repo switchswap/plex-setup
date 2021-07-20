@@ -35,6 +35,7 @@ services:
     cap_add:
       - NET_ADMIN
     container_name: transmission_openvpn
+    restart: unless-stopped
     dns:
       - 8.8.8.8  # Using google dns
       - 8.8.4.4 
@@ -65,7 +66,6 @@ services:
         max-size: 10m
     ports:
       - '9091:9091'
-    # restart: unless-stopped   
 
   overseerr:
     image: ghcr.io/linuxserver/overseerr
