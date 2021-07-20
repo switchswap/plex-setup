@@ -118,7 +118,32 @@ services:
     volumes:
       - ${APPDATA}plex:/config
       - ${GMEDIA}
-
+      
+  wireguard:
+    image: ghcr.io/linuxserver/wireguard
+    container_name: wireguard
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - SERVERURL=auto
+      - SERVERPORT=51820
+      - PEERS=${WIREGUARD_PEERS}
+      - PEERDNS=8.8.8.8  # Google dns
+      - INTERNAL_SUBNET=10.13.13.0
+      - ALLOWEDIPS=0.0.0.0/0
+    volumes:
+      - ${APPDATA}wireguard:/config
+      - /lib/modules:/lib/modules
+    ports:
+      - 51820:51820/udp
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+  
   watchtower:
       image: containrrr/watchtower
       container_name: watchtower
