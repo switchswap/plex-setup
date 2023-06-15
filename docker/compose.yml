@@ -1,5 +1,64 @@
 version: "3"
 services:
+  plex:
+    image: ghcr.io/linuxserver/plex
+    container_name: plex
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+    volumes:
+      - ${APPDATA}plex:/config
+      - ${GMEDIA}
+
+  plexautolanguages:
+    image: remirigal/plex-auto-languages:latest
+    container_name: plex-auto-languages
+    environment:
+      - PLEX_URL=${PLEX_URL}
+      - PLEX_TOKEN=${PLEX_TOKEN}
+      - TZ=${TZ}
+    volumes:
+      - ${APPDATA}plexautolanguages:/config
+
+  tautulli:
+    image: ghcr.io/linuxserver/tautulli
+    container_name: tautulli
+    restart: unless-stopped
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${APPDATA}tautulli:/config
+    ports:
+      - 8181:8181
+
+  plex-meta-manager:
+    image: meisnate12/plex-meta-manager
+    container_name: plex-meta-manager
+    restart: unless-stopped
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${APPDATA}pmm:/config
+  
+  overseerr:
+    image: ghcr.io/linuxserver/overseerr
+    container_name: overseerr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${APPDATA}overseerr:/config
+    ports:
+      - 5055:5055
+    restart: unless-stopped
+  
   sonarr:
     image: ghcr.io/linuxserver/sonarr:latest
     container_name: sonarr
@@ -11,7 +70,8 @@ services:
     volumes:
       - ${APPDATA}sonarr:/config
       - ${GMEDIA_TV}
-      - ${DOWNLOAD}
+      - ${GMEDIA_ANIME}
+      - ${DOWNLOADS}
     ports:
       - 8989:8989
       
@@ -26,60 +86,68 @@ services:
     volumes:
       - ${APPDATA}radarr:/config
       - ${GMEDIA_MOVIE}
-      - ${DOWNLOAD}
+      - ${DOWNLOADS}
     ports:
       - 7878:7878
 
-  transmission_openvpn:
-    image: haugene/transmission-openvpn
+  gluetun:
+    image: qmcgaw/gluetun
+    container_name: gluetun
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"  # Watchtower should not update this
     cap_add:
       - NET_ADMIN
-    container_name: transmission_openvpn
-    restart: unless-stopped
-    dns:
-      - 8.8.8.8  # Using google dns
-      - 8.8.4.4 
-    volumes:
-      - ${APPDATA}transmission:/data  # Transmission-openvpn data folder where config and stuff defaults 
-      - ${DOWNLOAD}
-      - ${WATCH}
-      - ${APPDATA}transmission/scripts:/scripts  # In case you want to plug into any of the image hooks
     environment:
       - TZ=${TZ}
       - PUID=${PUID}
       - PGID=${PGID}
-      - LOCAL_NETWORK=192.168.1.0/24
-      - OPENVPN_CONFIG=${OPENVPN_CONFIG}
-      - OPENVPN_USERNAME=${OPENVPN_USER}
+      - VPN_SERVICE_PROVIDER=${OPENVPN_PROVIDER}
+      - VPN_TYPE=openvpn
+      - VPN_ENDPOINT_PORT=1194
+      - OPENVPN_USER=${OPENVPN_USER}
       - OPENVPN_PASSWORD=${OPENVPN_PASS}
-      - OPENVPN_PROVIDER=${OPENVPN_PROVIDER}
-      - TRANSMISSION_DOWNLOAD_DIR=/download/complete  # Make sure this corresponds to the ${DOWNLOAD} volume
-      - TRANSMISSION_INCOMPLETE_DIR=/download/incomplete  # Make sure this corresponds to the ${DOWNLOAD} volume
-      - TRANSMISSION_WATCH_DIR=/watch  # Make sure this corresponds to the ${WATCH} volume
-      - TRANSMISSION_WEB_UI=flood-for-transmission
-      - TRANSMISSION_RPC_USERNAME=${TRANSMISSION_USER}
-      - TRANSMISSION_RPC_PASSWORD=${TRANSMISSION_PASS}
-      - TRANSMISSION_RPC_AUTHENTICATION_REQUIRED=true
-    logging:
-      driver: json-file
-      options:
-        max-size: 10m
+      - SERVER_REGIONS=${OPENVPN_REGIONS}
     ports:
-      - '9091:9091'
+    # qbittorrent ports
+      - 9092:9092
+      - 6881:6881
+      - 6881:6881/udp
+    # deluge ports
+      - 8112:8112
+    restart: unless-stopped
 
-  overseerr:
-    image: ghcr.io/linuxserver/overseerr
-    container_name: overseerr
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:4.4.5
+    container_name: qbittorrent
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"  # Watchtower should not update this
     environment:
+      - TZ=${TZ}
       - PUID=${PUID}
       - PGID=${PGID}
-      - TZ=${TZ}
+      - WEBUI_PORT=9092
     volumes:
-      - ${APPDATA}overseerr:/config
-    ports:
-      - 5055:5055
+      - ${APPDATA}qbittorrent:/config
+      - ${DOWNLOADS}
+      - ${WATCH}
+    network_mode: "service:gluetun"
     restart: unless-stopped
-      
+  
+  deluge:
+    image: lscr.io/linuxserver/deluge:latest
+    container_name: deluge
+    environment:
+      - TZ=${TZ}
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - DELUGE_LOGLEVEL=error #optional
+    volumes:
+      - ${APPDATA}deluge:/config
+      - ${DOWNLOADS}
+      - ${WATCH}
+    network_mode: "service:gluetun"
+    restart: unless-stopped
+
   jackett:
     image: linuxserver/jackett
     container_name: jackett
@@ -93,32 +161,20 @@ services:
       - ${APPDATA}jackett:/config
     ports:
       - 9117:9117
-      
-  tautulli:
-    image: ghcr.io/linuxserver/tautulli
-    container_name: tautulli
-    restart: unless-stopped
+
+  prowlarr:
+    image: linuxserver/prowlarr:develop
+    container_name: prowlarr
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
+      - PUID=${USVC}
+      - PGID=${GSVC}
       - TZ=${TZ}
     volumes:
-      - ${APPDATA}tautulli:/config
+      - ${APPDATA}prowlarr:/config
     ports:
-      - 8181:8181
-      
-  plex:
-    image: ghcr.io/linuxserver/plex
-    container_name: plex
+      - 9696:9696
     restart: unless-stopped
-    network_mode: host
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-    volumes:
-      - ${APPDATA}plex:/config
-      - ${GMEDIA}
-      
+     
   wireguard:
     image: ghcr.io/linuxserver/wireguard
     container_name: wireguard
@@ -167,6 +223,9 @@ services:
   watchtower:
       image: containrrr/watchtower
       container_name: watchtower
+      environment:
+        TZ: "${TZ}"
+        WATCHTOWER_CLEANUP: "true"
       volumes:
          - /var/run/docker.sock:/var/run/docker.sock
         
@@ -184,3 +243,4 @@ services:
 
 volumes:
   portainer_data:
+  
